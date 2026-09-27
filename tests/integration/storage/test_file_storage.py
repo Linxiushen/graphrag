@@ -6,7 +6,9 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
+import pytest
 from graphrag_storage.file_storage import (
     FileStorage,
 )
@@ -27,6 +29,47 @@ async def test_find():
     await storage.delete("test.txt")
     output = await storage.get("test.txt")
     assert output is None
+
+
+@pytest.mark.parametrize("pattern", [r".*", r".*\.txt$"])
+async def test_find_excludes_directories(pattern):
+    with TemporaryDirectory() as directory:
+        base_dir = Path(directory)
+        (base_dir / "archive.txt").mkdir()
+        (base_dir / "empty.txt").mkdir()
+        (base_dir / "nested").mkdir()
+        contents = {
+            "root.txt": "root document",
+            str(Path("archive.txt") / "document.txt"): "archived document",
+            str(Path("nested") / "note.txt"): "nested document",
+            str(Path("nested") / "data.json"): "{}",
+        }
+        for name, content in contents.items():
+            (base_dir / name).write_text(content, encoding="utf-8")
+
+        storage = FileStorage(directory)
+        items = list(storage.find(re.compile(pattern)))
+        expected = (
+            contents
+            if pattern == r".*"
+            else {
+                name: content
+                for name, content in contents.items()
+                if name.endswith(".txt")
+            }
+        )
+        assert set(items) == set(expected)
+        assert len(items) == len(expected)
+        for name in items:
+            assert await storage.get(name) == expected[name]
+
+
+def test_find_with_only_matching_directories():
+    with TemporaryDirectory() as directory:
+        (Path(directory) / "empty.txt").mkdir()
+        storage = FileStorage(directory)
+
+        assert list(storage.find(re.compile(r".*\.txt$"))) == []
 
 
 async def test_get_creation_date():

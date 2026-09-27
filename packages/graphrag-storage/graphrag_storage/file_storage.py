@@ -52,7 +52,7 @@ class FileStorage(Storage):
         num_filtered = 0
         for file in all_files:
             match = file_pattern.search(f"{file}")
-            if match:
+            if match and file.is_file():
                 filename = f"{file}".replace(str(self._base_dir), "", 1)
                 if filename.startswith(os.sep):
                     filename = filename[1:]

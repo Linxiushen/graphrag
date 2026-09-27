@@ -1,0 +1,4 @@
+{
+  "type": "patch",
+  "description": "Exclude directories from file storage search results."
+}
